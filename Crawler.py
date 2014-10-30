@@ -1,57 +1,43 @@
-__author__ = 'Anja'
+import requests
+from web_resource import WebResource
 
-import urllib2
-from Resource import Resource
-from bs4 import BeautifulSoup # To get everything
-from string import Template
-# Crawler besteht aus Downloader, Parser(Beautiful Soup) und Frontier
-# Lucas, Ado
+class Crawler:
+    to_visit = set()
+    visited = set()
+    web_resources = []
 
-class Crawler():
-    toVisit = []
-    blacklist = []
-    resources = []
-    def __init__(self):
-        urls = ['http://mysql12.f4.htw-berlin.de/crawl/d01.html','http://mysql12.f4.htw-berlin.de/crawl/d06.html', 'http://mysql12.f4.htw-berlin.de/crawl/d08.html']
-        self.toVisit.extend(urls)
-        self.frontier()
+    def __init__(self, start_urls):
+        self.to_visit = set(start_urls)
 
-    def downloadSite(self, page):
-        content = urllib2.urlopen(page).read()
-        return content
+    # Frontier. Starts the crawling.
+    # Main loop and logic for visit the pages.
+    def start(self):
+        while(self.to_visit):
+            # Download
+            current_url = self.to_visit.pop()
+            request = self.download(current_url)
+            web_resource = WebResource(request)
+            # Parse
+            self.web_resources.append(web_resource)
+            self.addUnknownUrlsToVisit(web_resource.links)
 
-    def parse(self, url):
-        href = []
-        html = urllib2.urlopen(url)
-        source = BeautifulSoup(html.read())
-        links = source.find_all('a')
-        for link in links:
-            if link.has_attr('href'):
-                link = link['href']
-                if (link.find('http://')) >= -1:
-                    s = Template('http://mysql12.f4.htw-berlin.de/crawl/$url')
-                    link = s.substitute(url=link)
-                href.append(link)
+        # Show the visited
+        #for web_resource in self.web_resources:
+            #print("------")
+            #print(web_resource.request.url)
+            #print(web_resource.urls)
 
-        #erzeuge das Resources Object
-        content = self.downloadSite(url) # Content muss in den Index
-        self.resources.append(Resource(url, href, content))
-        # Ende Downloader und Resourcenbau
-        return href
+    # Downloads a url and marks the url as visited.
+    def download(self, url):
+        self.visited.add(url)
+        return requests.get(url)
 
-    def frontier(self):
-        while (len(self.toVisit) >0):               # Seed URLS in ToVisit
-            for link in self.toVisit:
-                foundLinks = self.parse(link)       # hole alle links raus
-                for url in foundLinks:
-                    if (self.blacklist.__contains__(url) or self.toVisit.__contains__(url)):    # schon auf eine Liste?
-                        foundLinks.remove(url)                                                  # haben wir schon, kann weg
+    # Checks if the urls are in the set visited. When not it
+    # Adds them to the set to_visit for further crawling.
+    def addUnknownUrlsToVisit(self, urls):
+        for url in urls:
+            if url not in self.visited:
+                self.to_visit.add(url)
 
-                self.toVisit.extend(foundLinks)
-                self.blacklist.append(link)
-                for link in self.blacklist:
-                    if self.toVisit.__contains__(link):
-                        self.toVisit.remove(link)
-        print self.toVisit
-        print self.resources
-Crawler()
+
+
